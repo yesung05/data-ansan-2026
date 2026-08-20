@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>돼지 저금통 공장 라인 — 센서 모니터</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+    "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js",
+    "three/addons/exporters/OBJExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js",
+    "three/addons/exporters/GLTFExporter.js": "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT",
+    "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js": "sha384-4rziNxOBZKQ69i+w+f89KJ55TCYquwchVbByQwmaOeIOXdOU2PLDn3kOfXHwIJC9",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/OBJExporter.js": "sha384-nbwtoZENJD3Vq+ACK0CuGQdPMuDWHkamC2KJD70EV5nfg6jQjfppKOea07YJN+N3",
+    "https://unpkg.com/three@0.184.0/examples/jsm/exporters/GLTFExporter.js": "sha384-VofkvpG6HERhFCYbsUOHeNXBCqID2nfqkQqnVzE1jc/oPcz+qJ13ADdXH08hE+cQ"
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--color-bg); color: var(--color-text);
+    font-family: var(--font-body), "Noto Sans KR", sans-serif;
+    display: grid; grid-template-columns: 1fr 400px; grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+  three-d-stage:not(:defined) { visibility: hidden; }
+
+  header {
+    grid-column: 1 / -1; display: flex; align-items: baseline; gap: var(--space-6);
+    padding: var(--space-4) var(--space-6); border-bottom: 2px solid var(--color-text);
+  }
+  header h1 { font: 800 20px/1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0; letter-spacing: -0.01em; }
+  header .sub { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; }
+  header .spacer { flex: 1; }
+  .counters { display: flex; gap: var(--space-6); }
+  .counters div { display: flex; align-items: baseline; gap: 6px; }
+  .counters span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+  .counters b { font: 600 16px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+
+  main { position: relative; border-right: 2px solid var(--color-text); min-width: 0; }
+  three-d-stage { width: 100%; height: 100%; display: block; }
+  .phase {
+    position: absolute; left: var(--space-6); top: var(--space-6);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--color-text); color: var(--color-bg);
+    padding: 8px 14px; font-size: 12px; letter-spacing: 0.04em;
+  }
+  .phase::before { content: ""; width: 8px; height: 8px; background: var(--color-accent); }
+  body.alarm .phase { background: var(--color-accent); color: #fff; }
+  body.alarm main::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 0 6px var(--color-accent); animation: flash 0.9s steps(2, jump-none) infinite;
+  }
+  @keyframes flash { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0.12 } }
+
+  aside { overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column; min-height: 0; }
+  .status { padding: var(--space-4) var(--space-6); border-bottom: 2px solid var(--color-text); }
+  .status .k { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; }
+  .status .v { font: 800 22px/1.15 var(--font-heading), "Noto Sans KR", sans-serif; margin-top: 4px; }
+  .status .n { font-size: 12px; margin-top: 6px; opacity: 0.75; text-wrap: pretty; }
+  body.alarm .status { background: var(--color-accent); color: #fff; }
+  body.alarm .status .k, body.alarm .status .n { opacity: 0.9; }
+
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 2px solid var(--color-text); }
+  .controls button {
+    appearance: none; border: 0; border-right: 1px solid var(--color-divider);
+    background: var(--color-bg); color: var(--color-text);
+    font: 600 12px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.04em;
+    text-align: left; padding: 14px var(--space-6); cursor: pointer;
+  }
+  .controls button:hover { background: var(--color-accent-200); }
+  .controls button:active { background: var(--color-accent-300); }
+  .controls button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  #btn-run { background: var(--color-accent); color: #fff; grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--color-divider); }
+  #btn-run:hover { background: var(--color-accent-600); }
+  #btn-reset { border-right: 0; }
+
+  .grp { border-bottom: 2px solid var(--color-text); padding: var(--space-4) var(--space-6) var(--space-6); }
+  .grp-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: var(--space-4); }
+  .grp-n { font: 600 10px/1 var(--font-heading), sans-serif; letter-spacing: 0.1em; color: var(--color-accent); }
+  .grp h2 { font: 700 13px/1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0; letter-spacing: 0.02em; }
+
+  /* ---- 제품 생산 이력 ---- */
+  .grp-h #btn-copy-log {
+    margin-left: auto; appearance: none; cursor: pointer;
+    border: 1px solid var(--color-divider); background: var(--color-bg); color: var(--color-text);
+    font: 600 10px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.04em;
+    padding: 5px 9px;
+  }
+  .grp-h #btn-copy-log:hover { background: var(--color-accent-200); }
+  .grp-h #btn-copy-log:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+  .hist-empty { font-size: 11px; opacity: 0.6; margin: 0; text-wrap: pretty; }
+  .hist-empty[hidden] { display: none; }
+  #hist-list { display: flex; flex-direction: column; gap: 10px; }
+  .hist { border: 1px solid var(--color-divider); border-left: 3px solid var(--color-text); padding: 9px 11px; }
+  .hist[data-result="불량"] { border-left-color: var(--color-accent); }
+  .hist-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+  .hist-no { font: 700 12px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+  .hist-tag {
+    font: 600 9px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.08em;
+    padding: 3px 6px; background: var(--color-text); color: var(--color-bg);
+  }
+  .hist[data-result="불량"] .hist-tag { background: var(--color-accent); color: #fff; }
+  .hist-time { margin-left: auto; font-size: 9.5px; opacity: 0.55; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .hist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px 8px; margin: 0; }
+  .hist-grid > div { padding: 3px 0; min-width: 0; }
+  .hist-grid dt { font-size: 9px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-grid dd {
+    margin: 1px 0 0; font: 600 12px/1.1 var(--font-heading), sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .hist-grid dd i { font-style: normal; font-size: 8.5px; font-weight: 400; opacity: 0.55; margin-left: 2px; }
+  .hist-grid .over dt, .hist-grid .over dd { color: var(--color-accent-700); }
+  .hist-grid .over dd::after { content: " ▲"; font-size: 8px; }
+
+  .row { padding: 10px 0; border-top: 1px solid var(--color-divider); }
+  .row:first-of-type { border-top: 0; }
+  .row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .row-label { font-size: 12px; font-weight: 500; }
+  .row-val { font-variant-numeric: tabular-nums; }
+  .row-val b { font: 600 15px/1 var(--font-heading), sans-serif; }
+  .row-val i { font-style: normal; font-size: 10px; opacity: 0.6; letter-spacing: 0.06em; }
+  .bar { position: relative; height: 10px; background: var(--color-neutral-200); margin: 7px 0 4px; }
+  .bar-fill { height: 100%; width: 0; background: var(--color-text); transition: width 0.12s linear; }
+  .bar-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--color-accent); }
+  .row.bad .bar-fill { background: var(--color-accent); }
+  .row.bad .row-label { color: var(--color-accent-700); font-weight: 700; }
+  .row.bad .row-val b { color: var(--color-accent-700); }
+  .row-scale { display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 0.08em; opacity: 0.55; }
+  .row-scale .lim { color: var(--color-accent-700); opacity: 1; }
+
+  input[type="range"] { appearance: none; width: 100%; height: 18px; background: transparent; margin: 0; cursor: ew-resize; }
+  input[type="range"]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--color-divider); }
+  input[type="range"]::-webkit-slider-thumb { appearance: none; width: 10px; height: 18px; margin-top: -8px; background: var(--color-text); border: 0; }
+  .row.bad input[type="range"]::-webkit-slider-thumb { background: var(--color-accent); }
+  input[type="range"]::-moz-range-track { height: 2px; background: var(--color-divider); }
+  input[type="range"]::-moz-range-thumb { width: 10px; height: 18px; border-radius: 0; background: var(--color-text); border: 0; }
+
+  /* ============ 공장 전경 관리 페이지 (슬라이드 인) ============ */
+  .overview {
+    position: fixed; inset: 0 0 0 64px; z-index: 40; background: var(--color-bg); color: var(--color-text);
+    display: grid; grid-template-columns: 1fr 400px; grid-template-rows: auto minmax(0, 1fr);
+    transform: translateX(100%); transition: transform 780ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: -14px 0 40px rgba(32, 30, 29, 0.18); visibility: hidden;
+  }
+  .overview.open { transform: none; visibility: visible; }
+
+  .ov-head {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: var(--space-6);
+    padding: var(--space-4) var(--space-6); border-bottom: 2px solid var(--color-text);
+  }
+  .ov-head h1 { font: 800 20px/1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0; letter-spacing: -0.01em; }
+  .ov-head .sub { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; margin-top: 4px; }
+  .ov-head .spacer { flex: 1; }
+  .ov-meta { display: flex; align-items: baseline; gap: 10px; }
+  .ov-meta span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+  .ov-meta b { font: 600 16px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+  .ov-back {
+    appearance: none; border: 2px solid var(--color-text); background: var(--color-bg); color: var(--color-text);
+    font: 600 12px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.04em;
+    padding: 11px 16px; text-align: left; cursor: pointer;
+  }
+  .ov-back:hover { background: var(--color-text); color: var(--color-bg); }
+  .ov-back:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+  .ov-plan { position: relative; border-right: 2px solid var(--color-text); padding: var(--space-6); min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .ov-plan-t { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.6; margin-bottom: var(--space-4); }
+  .ov-svg { flex: 1; min-height: 0; display: flex; align-items: center; }
+  .ov-svg svg { width: 100%; height: 100%; max-height: 100%; display: block; }
+  .ov-legend { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 0.08em; opacity: 0.7; padding-top: var(--space-4); border-top: 1px solid var(--color-divider); }
+  .ov-legend .lg { width: 12px; height: 6px; background: var(--color-text); }
+  .ov-legend .lg:not(:first-child) { margin-left: var(--space-4); }
+  .ov-legend .lg-bad { background: var(--color-accent); }
+  .ov-legend .lg-belt { background: var(--color-neutral-400); }
+
+  .ov-svg text { font-family: var(--font-heading), "Noto Sans KR", sans-serif; fill: var(--color-text); }
+  .ov-svg .zone, .ov-svg .strip { font-size: 12px; letter-spacing: 0.14em; opacity: 0.55; text-anchor: middle; }
+  .ov-svg .strip { text-anchor: start; font-size: 11px; }
+  .ov-svg .ln { font-size: 17px; font-weight: 800; letter-spacing: 0.02em; }
+  .ov-svg .lnote { font-size: 11px; opacity: 0.6; }
+  .ov-svg .belt { fill: var(--color-neutral-400); }
+  .ov-svg .flow { stroke: var(--color-neutral-400); stroke-width: 6; }
+  .ov-svg .box { fill: var(--color-bg); stroke: var(--color-text); stroke-width: 2; }
+  .ov-svg .code { font-size: 13px; font-weight: 700; text-anchor: middle; letter-spacing: 0.04em; }
+  .ov-svg .sname { font-size: 11px; text-anchor: middle; opacity: 0.7; }
+  .ov-svg .pip { fill: var(--color-neutral-400); }
+  .ov-svg .pip.bad { fill: var(--color-accent); }
+  .ov-svg .st { cursor: pointer; }
+  .ov-svg .st:hover .box { fill: var(--color-accent-100); }
+  .ov-svg .st:focus-visible { outline: 2px solid var(--color-accent); }
+  .ov-svg .ring { stroke: none; }
+  .ov-svg .line.sel .box { stroke-width: 2.5; }
+  .ov-svg .line.sel .ln { fill: var(--color-accent); }
+  .ov-svg .line.alarm .band { fill: var(--color-accent-100); }
+  .ov-svg .line.alarm .belt, .ov-svg .line.alarm .flow { fill: var(--color-accent); stroke: var(--color-accent); }
+  .ov-svg .st.alarm .box { fill: var(--color-accent); stroke: var(--color-accent); }
+  .ov-svg .st.alarm .code { fill: #fff; }
+  .ov-svg .st.alarm .ring { stroke: var(--color-accent); stroke-width: 2; animation: ovring 1.4s ease-out infinite; }
+  @keyframes ovring { 0% { opacity: 1; transform: scale(0.9) } 100% { opacity: 0; transform: scale(1.12) } }
+  .ov-svg .st.alarm .ring { transform-box: fill-box; transform-origin: center; }
+
+  .ov-peek {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 64px; z-index: 41; pointer-events: none;
+    display: none; align-items: center; justify-content: center; border-right: 2px solid var(--color-text);
+  }
+  body.overview-on .ov-peek { display: flex; }
+  .ov-peek span {
+    writing-mode: vertical-rl; font: 600 10px/1 var(--font-body), "Noto Sans KR", sans-serif;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-text); opacity: 0.55;
+    background: var(--color-bg); padding: 10px 3px;
+  }
+
+  .ov-alerts { position: absolute; bottom: var(--space-6); right: var(--space-6); width: 330px; z-index: 3; }
+  @media (max-width: 1180px) { .ov-alerts { width: 268px; } }
+  .ov-alerts:empty { display: none; }
+  .ov-alert { background: var(--color-accent); color: #fff; padding: 12px 16px; box-shadow: var(--shadow-lg); }
+  .ov-alert-k { cursor: grab; user-select: none; }
+  .ov-alert.dragging .ov-alert-k { cursor: grabbing; }
+  .ov-alert-h { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .ov-alert-t { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.85; letter-spacing: 0.06em; }
+  .ov-dot { width: 8px; height: 8px; background: #fff; animation: flash 0.9s steps(2, jump-none) infinite; }
+  .ov-alert-line { font: 800 17px/1.25 var(--font-heading), "Noto Sans KR", sans-serif; margin: 7px 0 10px; }
+  .ov-alert-rows { display: flex; flex-direction: column; }
+  .ov-alert-row { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255, 255, 255, 0.35); font-size: 12px; }
+  .ov-alert-row b { margin-left: auto; font: 600 14px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+  .ov-alert-row i { font-style: normal; font-size: 10px; opacity: 0.8; letter-spacing: 0.06em; }
+  .ov-alert-a { display: flex; gap: 8px; margin-top: 12px; }
+  .ov-alert-a button {
+    appearance: none; flex: 1; border: 2px solid #fff; background: transparent; color: #fff;
+    font: 600 11px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.06em;
+    padding: 10px 12px; text-align: left; cursor: pointer;
+  }
+  .ov-alert-a button:hover { background: #fff; color: var(--color-accent-700); }
+  .ov-alert-a button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  .ov-nav { overflow-y: auto; scrollbar-gutter: stable; min-height: 0; }
+  .ov-lines { border-bottom: 2px solid var(--color-text); }
+  .ov-line {
+    appearance: none; width: 100%; display: flex; flex-direction: column; gap: 5px; align-items: stretch;
+    border: 0; border-bottom: 1px solid var(--color-divider); background: var(--color-bg); color: var(--color-text);
+    padding: 14px var(--space-6); text-align: left; cursor: pointer; font-family: var(--font-body), "Noto Sans KR", sans-serif;
+  }
+  .ov-line:last-child { border-bottom: 0; }
+  .ov-line:hover { background: var(--color-neutral-200); }
+  .ov-line:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  .ov-line-h { display: flex; align-items: center; gap: 10px; }
+  .ov-line-h b { font: 700 14px/1 var(--font-heading), sans-serif; letter-spacing: 0.04em; }
+  .ov-chip { font-style: normal; font-size: 10px; letter-spacing: 0.12em; padding: 4px 8px; margin-left: auto; background: var(--color-neutral-200); }
+  .ov-line-n { font-size: 11px; opacity: 0.65; }
+  .ov-line.on { background: var(--color-text); color: var(--color-bg); }
+  .ov-line.on .ov-chip { background: rgba(255, 255, 255, 0.18); }
+  .ov-line.on:hover { background: var(--color-text); }
+  .ov-line.alarm .ov-chip { background: var(--color-accent); color: #fff; }
+  .ov-nav .grp { border-bottom: 2px solid var(--color-text); padding: var(--space-4) var(--space-6) var(--space-6); }
+  .ov-nav .row-scale .lim { color: var(--color-accent-700); opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>돼지 저금통 공장 라인</h1>
+    <div class="sub">Piggy bank line · sensor monitor</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="counters">
+    <div><span>사이클</span><b id="c-cycle">0</b></div>
+    <div><span>완성</span><b id="c-done">0</b></div>
+    <div><span>불량</span><b id="c-reject">0</b></div>
+  </div>
+</header>
+
+<main>
+  <three-d-stage name="piggybank_factory_line" background="#f3f2f2"></three-d-stage>
+  <div class="phase" id="phase">대기</div>
+</main>
+
+<aside>
+  <div class="status">
+    <div class="k">라인 상태</div>
+    <div class="v" id="status">대기</div>
+    <div class="n" id="status-note">전 센서 정상 범위</div>
+  </div>
+  <div class="controls">
+    <button id="btn-run">▶ 정상 사이클 실행</button>
+    <button id="btn-fault">⚠ 경고 사이클</button>
+    <button id="btn-reset">⟲ 초기화</button>
+  </div>
+  <div id="sensors"></div>
+
+  <section class="grp" id="history">
+    <div class="grp-h">
+      <span class="grp-n">04</span>
+      <h2>제품 생산 이력</h2>
+      <button id="btn-copy-log" type="button">이력 복사</button>
+    </div>
+    <p class="hist-empty" id="hist-empty">아직 완성된 제품이 없습니다. 사이클을 실행하면 제품마다 센서 9종 값이 기록됩니다.</p>
+    <div id="hist-list"></div>
+  </section>
+</aside>
+
+<script src="js/three-d-stage.js"></script>
+<script src="js/plant-overview.js"></script>
+<script type="module" src="js/piggy-line.js"></script>
+</body>
+</html>

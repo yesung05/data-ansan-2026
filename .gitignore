@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+
+# 에디터
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python (serve.py 실행 흔적)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
