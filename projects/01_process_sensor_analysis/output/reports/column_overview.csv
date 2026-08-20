@@ -1,0 +1,11 @@
+﻿,Dtype,Non-Null Count,Null Count,Null Ratio (%),Unique Values
+timestamp,str,600,0,0.0,600
+line_id,str,600,0,0.0,3
+machine_id,str,600,0,0.0,9
+temp_C,float64,600,0,0.0,218
+pressure_bar,float64,600,0,0.0,144
+vibration_mm_s,float64,575,25,4.17,209
+humidity_pct,float64,560,40,6.67,219
+cycle_time_sec,float64,600,0,0.0,120
+shift,str,600,0,0.0,2
+defect_flag,int64,600,0,0.0,2
