@@ -34,15 +34,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 def main():
     socketserver.TCPServer.allow_reuse_address = True
     try:
-        server = socketserver.TCPServer(("127.0.0.1", PORT), Handler)
+        server = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
     except OSError as err:
         print(f"[오류] {PORT} 포트를 열 수 없습니다: {err}")
         print(f"       다른 포트로 실행해 보세요 —  python serve.py {PORT + 1}")
         return 1
 
+    import socket
+    local_ip = socket.gethostbyname(socket.gethostname())
     url = f"http://localhost:{PORT}/"
     print(f"돼지 저금통 공장 라인 3D 시뮬레이터")
-    print(f"  {url}")
+    print(f"  로컬:   {url}")
+    print(f"  외부:   http://{local_ip}:{PORT}/")
     print(f"  종료: Ctrl+C")
     threading.Timer(0.5, webbrowser.open, args=[url]).start()
 

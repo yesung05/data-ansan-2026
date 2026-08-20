@@ -48,9 +48,15 @@
     LINES.forEach((L, i) => {
       const top = 90 + i * 180, cy = top + 80;
       T.push(`<g class="line" data-line="${L.id}">`);
-      T.push(`<rect class="band" x="180" y="${top}" width="640" height="170" fill="none"/>`);
+      // 밴드 자체가 라인 선택 대상 — 설비 아이콘 밖을 눌러도 라인이 잡힌다
+      T.push(`<rect class="band" x="180" y="${top}" width="640" height="170" fill="transparent"/>`);
       T.push(`<text class="ln" x="196" y="${top + 30}">LINE ${L.id}</text>`);
       T.push(`<text class="lnote" x="196" y="${top + 46}">가동률 ${L.util}%</text>`);
+      // 선택된 라인에만 나타나는 그래프 버튼 (CSS 로 표시/숨김)
+      T.push(`<g class="gbtn" data-graph="${L.id}" tabindex="0" role="button" aria-label="LINE ${L.id} 통계 그래프 열기">`);
+      T.push(`<rect x="196" y="${top + 56}" width="104" height="26" rx="0"/>`);
+      T.push(`<text x="248" y="${top + 73}">통계 그래프</text>`);
+      T.push('</g>');
       T.push(`<rect class="belt" x="248" y="${cy - 3}" width="510" height="6"/>`);
       STATIONS.forEach((st, j) => {
         const cx = 288 + j * 152;
@@ -77,9 +83,13 @@
     const T = [];
     T.push('<div class="ov-lines">');
     for (const L of LINES) {
-      T.push(`<button class="ov-line" data-line="${L.id}">
-        <span class="ov-line-h"><b>LINE ${L.id}</b><i class="ov-chip">정상</i></span>
-        <span class="ov-line-n">${L.note}</span></button>`);
+      T.push(`<div class="ov-line" data-line="${L.id}">
+        <button class="ov-line-b" data-line="${L.id}" aria-label="LINE ${L.id} 선택">
+          <span class="ov-line-h"><b>LINE ${L.id}</b><i class="ov-chip">정상</i></span>
+          <span class="ov-line-n">${L.note}</span>
+        </button>
+        <button class="ov-graph" data-graph="${L.id}" hidden>통계 그래프 보기</button>
+      </div>`);
     }
     T.push('</div>');
     T.push('<div class="ov-sensors">');
@@ -99,6 +109,11 @@
     return T.join('');
   }
 
+  function openGraph(id) {
+    const L = LINES.find((l) => l.id === id);
+    if (L && window.LINE_STATS) window.LINE_STATS.open(L, S);
+  }
+
   function paint() {
     const L = LINES.find((l) => l.id === sel);
     navEl.querySelectorAll('.ov-line').forEach((b) => {
@@ -107,6 +122,7 @@
       const alarmed = alarm && alarm.line === id;
       b.classList.toggle('alarm', !!alarmed);
       b.querySelector('.ov-chip').textContent = alarmed ? '경고' : '정상';
+      b.querySelector('.ov-graph').hidden = id !== sel;   // 고른 라인에만 그래프 버튼
     });
     for (const s of S) {
       const v = L.vals[s.id], row = navEl.querySelector(`[data-row="${s.id}"]`);
@@ -182,15 +198,22 @@
     navEl.innerHTML = nav();
 
     navEl.addEventListener('click', (e) => {
-      const b = e.target.closest('.ov-line');
+      const gb = e.target.closest('.ov-graph');
+      if (gb) { openGraph(gb.dataset.graph); return; }
+      const b = e.target.closest('.ov-line-b');
       if (b) { sel = b.dataset.line; paint(); }
     });
     planEl.addEventListener('click', (e) => {
-      const g = e.target.closest('.st');
-      if (g) { sel = g.dataset.line; paint(); }
+      const gb = e.target.closest('.gbtn');
+      if (gb) { sel = gb.dataset.graph; paint(); openGraph(gb.dataset.graph); return; }
+      // 설비 아이콘이든 라인 밴드 어디든 — 누른 라인을 고른다
+      const g = e.target.closest('.st') || e.target.closest('.line');
+      if (g) { sel = g.dataset.line || g.dataset.st; paint(); }
     });
     planEl.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
+      const gb = e.target.closest('.gbtn');
+      if (gb) { e.preventDefault(); sel = gb.dataset.graph; paint(); openGraph(gb.dataset.graph); return; }
       const g = e.target.closest('.st');
       if (g) { e.preventDefault(); sel = g.dataset.line; paint(); }
     });

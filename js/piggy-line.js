@@ -1,5 +1,7 @@
 const stage = document.querySelector('three-d-stage');
 const { THREE } = await stage.ready;
+// The simulator is the only source of process state; remove manual test controls.
+document.querySelector('.controls')?.remove();
 
 /* ---------- materials (named — they become usemtl / GLB material names) ---------- */
 const M = {
@@ -171,10 +173,34 @@ const SENSORS = [
   { id: 'power',     group: 3, label: '전력량계 센서',   unit: 'kW',   min: 0,   max: 120, thr: 96,  def: 54,  x: 3.15, live: 2 },
   { id: 'runtime',   group: 3, label: '가동/정지 타이머', unit: 'min', min: 0,   max: 600, thr: 480, def: 226, x: 3.7, ticks: true },
 ];
+
+// Keep the gauge scales aligned with the simulator API.  The backend emits
+// temp_C, pressure_bar, vibration_mm_s, humidity_pct and cycle_time_sec.
+// label 필드는 의도적으로 제외 — SENSORS의 한국어 레이블을 보존한다.
+const LIVE_SENSOR_CONFIG = {
+  temp:      { unit: '°C', min: 150, max: 400, thr: 200, thrLow: 150, def: 178, dec: 1 },
+  pressure:  { unit: 'bar', min: 0, max: 15, thr: 5.9, thrLow: 2.5, def: 4.6, dec: 2 },
+  vibration: { unit: 'mm/s', min: 0, max: 10, thr: 4.6, thrLow: 0.25, def: 1.8, dec: 2 },
+  humidity:  { unit: '%RH', min: 0, max: 100, thr: 70, thrLow: 20, def: 39, dec: 1 },
+  cycle:     { unit: 's', min: 5, max: 120, thr: 42, thrLow: 18, def: 31, dec: 1 },
+  thickness: { unit: 'mm', min: 1, max: 6, thr: 4.4, thrLow: 2, def: 2.9, dec: 2 },
+  hardness:  { unit: 'HV', min: 150, max: 320, thr: 270, def: 215, dec: 1 },
+  power:     { unit: 'kW', min: 0, max: 120, thr: 96, def: 54, dec: 1 },
+  runtime:   { unit: 'min', min: 0, max: 600, thr: 480, def: 226, dec: 1 },
+};
+for (const sensor of SENSORS) Object.assign(sensor, LIVE_SENSOR_CONFIG[sensor.id] || {});
+
 const GROUPS = {
   1: ['01', '실시간 공정 센서'],
   2: ['02', '품질 및 물성 계측 센서'],
   3: ['03', '설비 에너지 및 가동 계측기'],
+};
+
+let currentLine = 'A';
+const LINE_DEFAULTS = {
+  A: Object.fromEntries(SENSORS.map((s) => [s.id, s.def])),
+  B: { temp: 174, pressure: 4.2, vibration: 1.4, humidity: 41, cycle: 22, thickness: 3.05, hardness: 228, power: 56, runtime: 305 },
+  C: { temp: 183, pressure: 4.9, vibration: 2.3, humidity: 48, cycle: 27, thickness: 2.7, hardness: 241, power: 63, runtime: 118 },
 };
 const BAR_BOT = 0.82, BAR_H = 0.62;
 
@@ -245,16 +271,13 @@ for (const key of ['1', '2', '3']) {
     row.innerHTML = `
       <div class="row-top"><span class="row-label">${s.label}</span><span class="row-val"><b>—</b> <i>${s.unit}</i></span></div>
       <div class="bar"><div class="bar-fill"></div><div class="bar-tick"></div>${s.thrLow != null ? '<div class="bar-tick low"></div>' : ''}</div>
-      <input type="range" min="${s.min}" max="${s.max}" step="${s.max - s.min > 60 ? 1 : 0.1}" value="${s.def}" aria-label="${s.label}">
       <div class="row-scale"><span>${s.min}</span><span class="lim">임계 ${s.thr}${s.thrLow != null ? ' / ' + s.thrLow : ''}</span><span>${s.max}</span></div>`;
     sec.appendChild(row);
     const tick = row.querySelector('.bar-tick');
     tick.style.left = pct(s, s.thr) + '%';
     const low = row.querySelector('.bar-tick.low');
     if (low) low.style.left = pct(s, s.thrLow) + '%';
-    const input = row.querySelector('input');
-    input.addEventListener('input', () => { s.val = parseFloat(input.value); paintSensor(s); evaluate(); });
-    rows[s.id] = { row, input, fill: row.querySelector('.bar-fill'), val: row.querySelector('.row-val b') };
+    rows[s.id] = { row, input: null, fill: row.querySelector('.bar-fill'), val: row.querySelector('.row-val b') };
   }
   panel.appendChild(sec);
 }
@@ -313,7 +336,7 @@ function phaseFor(t) {
 }
 
 function start(scenario) {
-  if (scenario === 'normal') reset(false);
+  if (scenario === 'normal' && !simulatorLive) reset(false);
   S.mode = 'run'; S.t = 0; S.scenario = scenario; S.rejected = false; S.glaze = 0; S.cause = [];
   S.cycle += 1; el.cyc.textContent = String(S.cycle);
   piggy.visible = true;
@@ -324,7 +347,7 @@ function reset(full = true) {
   clearTimeout(S.ovTimer);
   window.PLANT?.close();
   S.mode = 'idle'; S.t = 0; S.alarmT = 0; S.glaze = 0; S.rejected = false; S.cause = [];
-  for (const s of SENSORS) { s.val = s.def; rows[s.id].input.value = s.def; paintSensor(s); }
+  for (const s of SENSORS) { s.val = s.def; if (rows[s.id]?.input) rows[s.id].input.value = s.def; paintSensor(s); }
   if (full) { S.cycle = 0; S.done = 0; S.reject = 0; el.cyc.textContent = '0'; el.done.textContent = '0'; el.rej.textContent = '0'; clearLog(); }
   piggy.visible = false;
   piggy.position.set(-3.85, PIG_Y, 0);
@@ -348,8 +371,10 @@ function snapshot(result) {
   const entry = {
     no: LOG.length + 1,
     result,                                // '양품' | '불량'
+    line: currentLine,
     cycle: S.cycle,
     time: now.toTimeString().slice(0, 8),
+    date: now.toLocaleDateString('ko-KR'),
     sensors: SENSORS.map((s) => ({
       id: s.id, label: s.label, unit: s.unit,
       value: parseFloat(fmt(s)),           // 화면에 보이는 자릿수 그대로 기록
@@ -360,6 +385,11 @@ function snapshot(result) {
   LOG.unshift(entry);                      // 최신이 위로
   if (LOG.length > LOG_MAX) LOG.length = LOG_MAX;
   renderLog();
+  fetch(`${SIMULATOR_API}/api/production-log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  }).catch(() => {});
   return entry;
 }
 
@@ -404,7 +434,130 @@ document.getElementById('btn-copy-log').addEventListener('click', async (ev) => 
   setTimeout(() => (btn.textContent = '이력 복사'), 1600);
 });
 
-window.PLANT_FEED = () => SENSORS.map((s) => ({ id: s.id, val: s.val }));
+const SIMULATOR_API = window.SIMULATOR_API || `http://${location.hostname}:8001`;
+const LIVE_FIELD_MAP = {
+  temp: 'temp_C',
+  pressure: 'pressure_bar',
+  vibration: 'vibration_mm_s',
+  humidity: 'humidity_pct',
+  cycle: 'cycle_time_sec',
+};
+const liveReadings = new Map();
+let simulatorLive = false;
+let liveRuntimeSec = 0;
+
+function liveValuesForReading(reading) {
+  const source = reading?.values || {};
+  const values = {};
+  for (const [id, field] of Object.entries(LIVE_FIELD_MAP)) {
+    if (Number.isFinite(Number(source[field]))) values[id] = Number(source[field]);
+  }
+  const temp = values.temp ?? 178, pressure = values.pressure ?? 4.6;
+  const vibration = values.vibration ?? 1.8, humidity = values.humidity ?? 39;
+  const cycle = values.cycle ?? 31;
+  values.thickness = 2.9 + (pressure - 4.6) * 0.075 + (humidity - 39) * 0.002 + (temp - 178) * 0.001;
+  values.hardness = 215 + (temp - 178) * 0.22 - vibration * 1.7;
+  values.power = 35 + pressure * 2.2 + vibration * 4.0 + cycle * 0.15;
+  values.runtime = Math.min(600, liveRuntimeSec / 60);
+  return values;
+}
+
+function liveFeed(line = 'A') {
+  const reading = liveReadings.get(line);
+  if (!reading) return SENSORS.map((s) => ({ id: s.id, val: s.val }));
+  const values = liveValuesForReading(reading);
+  return SENSORS.map((s) => ({ id: s.id, val: values[s.id] ?? s.val }));
+}
+
+function setLiveSensor(id, value) {
+  const s = SENSORS.find((item) => item.id === id);
+  if (!s || !Number.isFinite(Number(value))) return;
+  // Keep the visual gauge inside the same bounds used by the API response.
+  s.val = Math.min(s.max, Math.max(s.min, Number(value)));
+  paintSensor(s);
+}
+
+function applyLiveReading(reading) {
+  if (!reading || !reading.line_id) return;
+  liveReadings.set(reading.line_id, reading);
+  if (reading.line_id !== currentLine) return;
+
+  const values = reading.values || {};
+  for (const [id, field] of Object.entries(LIVE_FIELD_MAP)) setLiveSensor(id, values[field]);
+
+  // Quality/energy gauges are derived deterministically from the five API sensors.
+  const derived = liveValuesForReading(reading);
+  for (const id of ['thickness', 'hardness', 'power', 'runtime']) setLiveSensor(id, derived[id]);
+
+  const completed = Number(reading.cycle?.completed_products || 0);
+  if (completed > 0) {
+    S.done += completed;
+    el.done.textContent = String(S.done);
+  }
+  simulatorLive = true;
+  evaluate();
+  window.dispatchEvent(new CustomEvent('plant-live-update', { detail: reading }));
+}
+
+function refreshThresholdMarkers(sensor) {
+  const row = rows[sensor.id];
+  if (!row) return;
+  const highTick = row.row.querySelector('.bar-tick:not(.low)');
+  const lowTick = row.row.querySelector('.bar-tick.low');
+  if (highTick) highTick.style.left = `${pct(sensor, sensor.thr)}%`;
+  if (lowTick && sensor.thrLow != null) lowTick.style.left = `${pct(sensor, sensor.thrLow)}%`;
+  const limitText = row.row.querySelector('.lim');
+  if (limitText) limitText.textContent = `limit ${sensor.thr.toFixed(sensor.dec || 0)}${sensor.thrLow != null ? ` / ${sensor.thrLow.toFixed(sensor.dec || 0)}` : ''}`;
+  const highMarker = model.getObjectByName(`gauge_limit_${sensor.id}`);
+  const lowMarker = model.getObjectByName(`gauge_limit_low_${sensor.id}`);
+  if (highMarker) highMarker.position.y = BAR_BOT + BAR_H * ((sensor.thr - sensor.min) / (sensor.max - sensor.min));
+  if (lowMarker && sensor.thrLow != null) lowMarker.position.y = BAR_BOT + BAR_H * ((sensor.thrLow - sensor.min) / (sensor.max - sensor.min));
+}
+
+async function loadSimulatorStatistics() {
+  try {
+    const response = await fetch(`${SIMULATOR_API}/api/simulator/statistics`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`statistics HTTP ${response.status}`);
+    const payload = await response.json();
+    const lineStats = Object.values(payload.statistics || {});
+    for (const [id, field] of Object.entries(LIVE_FIELD_MAP)) {
+      const samples = lineStats.map((line) => line[field]).filter(Boolean);
+      if (!samples.length) continue;
+      const high = Math.max(...samples.map((s) => Number(s.normal_high)));
+      const low = Math.min(...samples.map((s) => Number(s.normal_low)));
+      const spread = Math.max(...samples.map((s) => Number(s.std) || 0));
+      const sensor = SENSORS.find((item) => item.id === id);
+      if (!sensor) continue;
+      sensor.thr = Math.min(sensor.max, high + spread);
+      sensor.thrLow = Math.max(sensor.min, low - spread);
+      refreshThresholdMarkers(sensor);
+      paintSensor(sensor);
+    }
+  } catch (error) {
+    console.warn('[plant] simulator statistics unavailable; using fallback limits:', error.message);
+  }
+}
+
+async function pollSimulator() {
+  try {
+    const response = await fetch(`${SIMULATOR_API}/api/simulator/latest`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`simulator HTTP ${response.status}`);
+    const payload = await response.json();
+    for (const reading of payload.readings || []) applyLiveReading(reading);
+    liveRuntimeSec += 10;
+  } catch (error) {
+    // Keep the existing controls usable if the optional backend is stopped.
+    simulatorLive = false;
+    console.warn('[plant] simulator endpoint unavailable:', error.message);
+  }
+}
+
+window.PLANT_LINE_FEED = (line = 'A') => liveFeed(line);
+window.PLANT_FEED = () => liveFeed('A');
+loadSimulatorStatistics();
+pollSimulator();
+setInterval(pollSimulator, 10000);
+
 function raiseAlarm(cause) {
   if (S.mode === 'alarm') return;
   S.mode = 'alarm'; S.alarmT = 0; S.cause = cause;
@@ -435,14 +588,64 @@ function evaluate() {
   else paintStatus();
 }
 
-document.getElementById('btn-run').onclick = () => start('normal');
-document.getElementById('btn-fault').onclick = () => { reset(false); start('fault'); };
-document.getElementById('btn-reset').onclick = () => reset(true);
+// Manual run/fault/reset controls are intentionally removed; the backend drives the live state.
+
+/* ================= 라인 전환 ================= */
+function switchLine(lineId) {
+  if (!LINE_DEFAULTS[lineId] || lineId === currentLine) return;
+  currentLine = lineId;
+  document.querySelectorAll('.line-btn').forEach((b) => b.classList.toggle('on', b.dataset.line === lineId));
+  document.querySelector('header .sub').textContent = `LINE ${lineId} · sensor monitor`;
+  const reading = liveReadings.get(lineId);
+  if (reading) {
+    const values = liveValuesForReading(reading);
+    for (const s of SENSORS) setLiveSensor(s.id, values[s.id] ?? LINE_DEFAULTS[lineId][s.id] ?? s.def);
+    simulatorLive = true;
+  } else {
+    const defaults = LINE_DEFAULTS[lineId];
+    for (const s of SENSORS) { s.val = defaults[s.id] ?? s.def; paintSensor(s); }
+    simulatorLive = false;
+  }
+  evaluate();
+}
+
+document.querySelectorAll('.line-btn').forEach((btn) => {
+  btn.addEventListener('click', () => switchLine(btn.dataset.line));
+});
+
+const LINE_META = {
+  A: { label: 'A 라인', note: '3D 모니터 대상 · 주력 라인', util: '94.2' },
+  B: { label: 'B 라인', note: '동형 설비 · 소형 저금통',   util: '96.8' },
+  C: { label: 'C 라인', note: '시험 생산 · 신규 금형',     util: '91.5' },
+};
+
+document.getElementById('btn-stats')?.addEventListener('click', () => {
+  const meta = LINE_META[currentLine];
+  const lineObj = {
+    id: currentLine,
+    ...meta,
+    vals: Object.fromEntries(SENSORS.map((s) => [s.id, s.val])),
+  };
+  window.LINE_STATS?.open(lineObj, SENSORS);
+});
+
+document.getElementById('btn-overview')?.addEventListener('click', () => {
+  const feed = window.PLANT_LINE_FEED ? window.PLANT_LINE_FEED(currentLine) : [];
+  window.PLANT?.open({ line: currentLine, causes: [], sensors: feed });
+});
+
+document.getElementById('btn-resume')?.addEventListener('click', () => {
+  for (const s of SENSORS) {
+    s.val = s.def;
+    paintSensor(s);
+  }
+  reset(false);
+  start('normal');
+});
 
 function spike(id, target, p) {
   const s = SENSORS.find((v) => v.id === id);
   s.val = s.def + (target - s.def) * p;
-  rows[s.id].input.value = s.val;
   paintSensor(s);
 }
 
@@ -480,14 +683,14 @@ function frame(now) {
       if (p > 0) { spike('temp', 297, p); spike('vibration', 15.6, p); evaluate(); }
     }
     for (const s of SENSORS) {
-      if (s.ticks) { s.val = Math.min(s.max, s.val + dt * 1.2); rows[s.id].input.value = s.val; paintSensor(s); }
-      else if (s.live) {
+      if (s.ticks) { s.val = Math.min(s.max, s.val + dt * 1.2); paintSensor(s); }
+      else if (s.live && !simulatorLive) {
         const j = s.def + Math.sin(now / (900 + s.live * 400)) * s.live;
-        if (Math.abs(parseFloat(rows[s.id].input.value) - s.def) < 0.6) { s.val = j; paintSensor(s); }
+        s.val = j; paintSensor(s);
       }
     }
     if (t > 14.9 && !S.counted) {
-      S.counted = true; S.done += 1; el.done.textContent = String(S.done);
+      S.counted = true; if (!simulatorLive) S.done += 1; el.done.textContent = String(S.done);
       snapshot('양품');            // 완성 순간의 센서 9종을 그대로 남긴다
     }
     if (t > 16.6) { S.counted = false; start('normal'); }
@@ -541,4 +744,17 @@ function frame(now) {
 }
 for (const s of SENSORS) paintSensor(s);
 reset(true);
+// Start the visual cycle automatically now that manual controls are hidden.
+start('normal');
 requestAnimationFrame(frame);
+
+// 저장된 생산 이력 불러오기
+fetch(`${SIMULATOR_API}/api/production-log`, { cache: 'no-store' })
+  .then((r) => r.ok ? r.json() : [])
+  .then((saved) => {
+    if (!saved.length) return;
+    for (const entry of saved) LOG.push(entry);
+    if (LOG.length > LOG_MAX) LOG.length = LOG_MAX;
+    renderLog();
+  })
+  .catch(() => {});

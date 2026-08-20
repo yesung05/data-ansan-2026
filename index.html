@@ -4,9 +4,7 @@
 <meta charset="utf-8">
 <title>돼지 저금통 공장 라인 — 센서 모니터</title>
 <link rel="stylesheet" href="css/styles.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <script type="importmap">
 {
   "imports": {
@@ -29,7 +27,7 @@
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--color-bg); color: var(--color-text);
-    font-family: var(--font-body), "Noto Sans KR", sans-serif;
+    font-family: var(--font-body), sans-serif;
     display: grid; grid-template-columns: 1fr 400px; grid-template-rows: auto 1fr;
     overflow: hidden;
   }
@@ -39,13 +37,38 @@
     grid-column: 1 / -1; display: flex; align-items: baseline; gap: var(--space-6);
     padding: var(--space-4) var(--space-6); border-bottom: 2px solid var(--color-text);
   }
-  header h1 { font: 800 20px/1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0; letter-spacing: -0.01em; }
-  header .sub { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.6; }
+  header h1 { font: 800 22px/1 var(--font-heading), sans-serif; margin: 0; letter-spacing: -0.02em; }
+  header .sub { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
   header .spacer { flex: 1; }
+  .line-switcher { display: flex; gap: 4px; align-items: center; }
+  .line-btn {
+    appearance: none; border: 2px solid var(--color-text); background: var(--color-bg); color: var(--color-text);
+    font: 700 11px/1 var(--font-heading), sans-serif; letter-spacing: 0.1em;
+    padding: 8px 14px; cursor: pointer;
+  }
+  .line-btn:hover { background: var(--color-neutral-200); }
+  .line-btn.on { background: var(--color-text); color: var(--color-bg); }
+  .line-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  #btn-stats, #btn-overview {
+    appearance: none; border: 2px solid var(--color-text); background: var(--color-bg); color: var(--color-text);
+    font: 700 11px/1 var(--font-heading), sans-serif; letter-spacing: 0.06em;
+    padding: 8px 14px; cursor: pointer;
+  }
+  #btn-stats:hover, #btn-overview:hover { background: var(--color-neutral-200); }
+  #btn-stats:focus-visible, #btn-overview:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  #btn-resume {
+    display: none; appearance: none; width: 100%; margin-top: 12px;
+    border: 2px solid #fff; background: transparent; color: #fff;
+    font: 700 13px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.06em;
+    padding: 12px 16px; text-align: left; cursor: pointer;
+  }
+  #btn-resume:hover { background: rgba(255,255,255,0.15); }
+  #btn-resume:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  body.alarm #btn-resume { display: block; }
   .counters { display: flex; gap: var(--space-6); }
   .counters div { display: flex; align-items: baseline; gap: 6px; }
-  .counters span { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
-  .counters b { font: 600 16px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+  .counters span { font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; opacity: 0.6; }
+  .counters b { font: 600 18px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
 
   main { position: relative; border-right: 2px solid var(--color-text); min-width: 0; }
   three-d-stage { width: 100%; height: 100%; display: block; }
@@ -53,7 +76,7 @@
     position: absolute; left: var(--space-6); top: var(--space-6);
     display: flex; align-items: center; gap: 10px;
     background: var(--color-text); color: var(--color-bg);
-    padding: 8px 14px; font-size: 12px; letter-spacing: 0.04em;
+    padding: 9px 16px; font-size: 13px; letter-spacing: 0.03em;
   }
   .phase::before { content: ""; width: 8px; height: 8px; background: var(--color-accent); }
   body.alarm .phase { background: var(--color-accent); color: #fff; }
@@ -71,19 +94,6 @@
   body.alarm .status { background: var(--color-accent); color: #fff; }
   body.alarm .status .k, body.alarm .status .n { opacity: 0.9; }
 
-  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-bottom: 2px solid var(--color-text); }
-  .controls button {
-    appearance: none; border: 0; border-right: 1px solid var(--color-divider);
-    background: var(--color-bg); color: var(--color-text);
-    font: 600 12px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.04em;
-    text-align: left; padding: 14px var(--space-6); cursor: pointer;
-  }
-  .controls button:hover { background: var(--color-accent-200); }
-  .controls button:active { background: var(--color-accent-300); }
-  .controls button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
-  #btn-run { background: var(--color-accent); color: #fff; grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--color-divider); }
-  #btn-run:hover { background: var(--color-accent-600); }
-  #btn-reset { border-right: 0; }
 
   .grp { border-bottom: 2px solid var(--color-text); padding: var(--space-4) var(--space-6) var(--space-6); }
   .grp-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: var(--space-4); }
@@ -247,13 +257,14 @@
   .ov-nav { overflow-y: auto; scrollbar-gutter: stable; min-height: 0; }
   .ov-lines { border-bottom: 2px solid var(--color-text); }
   .ov-line {
-    appearance: none; width: 100%; display: flex; flex-direction: column; gap: 5px; align-items: stretch;
-    border: 0; border-bottom: 1px solid var(--color-divider); background: var(--color-bg); color: var(--color-text);
-    padding: 14px var(--space-6); text-align: left; cursor: pointer; font-family: var(--font-body), "Noto Sans KR", sans-serif;
+    display: flex; flex-direction: column;
+    border-bottom: 1px solid var(--color-divider); background: var(--color-bg); color: var(--color-text);
+    padding: 14px var(--space-6); font-family: var(--font-body), "Noto Sans KR", sans-serif;
   }
   .ov-line:last-child { border-bottom: 0; }
   .ov-line:hover { background: var(--color-neutral-200); }
-  .ov-line:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  .ov-line-b { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+    appearance: none; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
   .ov-line-h { display: flex; align-items: center; gap: 10px; }
   .ov-line-h b { font: 700 14px/1 var(--font-heading), sans-serif; letter-spacing: 0.04em; }
   .ov-chip { font-style: normal; font-size: 10px; letter-spacing: 0.12em; padding: 4px 8px; margin-left: auto; background: var(--color-neutral-200); }
@@ -262,8 +273,135 @@
   .ov-line.on .ov-chip { background: rgba(255, 255, 255, 0.18); }
   .ov-line.on:hover { background: var(--color-text); }
   .ov-line.alarm .ov-chip { background: var(--color-accent); color: #fff; }
+  .ov-graph {
+    appearance: none; cursor: pointer; margin-top: 8px; width: 100%;
+    border: 0; background: var(--color-text); color: var(--color-bg);
+    font: 700 11px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.06em;
+    padding: 9px 10px; text-align: left;
+  }
+  .ov-graph::before { content: "▤ "; }
+  .ov-graph:hover { background: var(--color-accent); color: #fff; }
+  .ov-graph:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .ov-graph[hidden] { display: none; }
   .ov-nav .grp { border-bottom: 2px solid var(--color-text); padding: var(--space-4) var(--space-6) var(--space-6); }
   .ov-nav .row-scale .lim { color: var(--color-accent-700); opacity: 1; }
+
+  /* ================= 전경도 그래프 버튼 ================= */
+  .ov-svg .gbtn { opacity: 0; pointer-events: none; transition: opacity 0.14s; }
+  .ov-svg .line.sel .gbtn { opacity: 1; pointer-events: auto; cursor: pointer; }
+  .ov-svg .gbtn rect { fill: var(--color-text); }
+  .ov-svg .gbtn text { fill: var(--color-bg); font-size: 11px; font-weight: 700; text-anchor: middle; letter-spacing: 0.04em; }
+  .ov-svg .line.sel .gbtn:hover rect { fill: var(--color-accent); }
+  .ov-svg .gbtn:focus-visible rect { stroke: var(--color-accent); stroke-width: 2.5; }
+
+  /* ================= 라인 통계 그래프 패널 ================= */
+  .ovg { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, #201e1d 55%, transparent);
+    display: flex; align-items: center; justify-content: center; padding: var(--space-6); }
+  .ovg[hidden] { display: none; }
+  .ovg-card { background: var(--color-bg); border: 2px solid var(--color-text); box-shadow: var(--shadow-lg);
+    width: min(1080px, 100%); max-height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  .ovg-head { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-4) var(--space-6);
+    border-bottom: 2px solid var(--color-text); }
+  .ovg-title { font: 800 20px/1.1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0; }
+  .ovg-sub { margin: 5px 0 0; font-size: 11px; opacity: 0.65; }
+  .ovg-tabs { margin-left: auto; display: flex; border: 1px solid var(--color-text); }
+  .ovg-tab { appearance: none; cursor: pointer; border: 0; background: var(--color-bg); color: var(--color-text);
+    font: 700 12px/1 var(--font-body), sans-serif; letter-spacing: 0.06em; padding: 10px 16px; }
+  .ovg-tab + .ovg-tab { border-left: 1px solid var(--color-text); }
+  .ovg-tab.on { background: var(--color-text); color: var(--color-bg); }
+  .ovg-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  .ovg-x { appearance: none; cursor: pointer; border: 1px solid var(--color-text); background: var(--color-bg);
+    color: var(--color-text); font-size: 13px; line-height: 1; padding: 9px 11px; }
+  .ovg-x:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+  .ovg-x:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .ovg-kpis { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 2px solid var(--color-text); }
+  .ovg-kpi { padding: 12px var(--space-4); border-right: 1px solid var(--color-divider); }
+  .ovg-kpi:last-child { border-right: 0; }
+  .ovg-kpi span { display: block; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; }
+  .ovg-kpi b { display: block; margin-top: 5px; font: 800 21px/1 var(--font-heading), sans-serif; font-variant-numeric: tabular-nums; }
+  .ovg-kpi i { font-style: normal; font-size: 11px; font-weight: 400; opacity: 0.55; margin-left: 3px; }
+  .ovg-scroll { position: relative; overflow-y: auto; min-height: 0; flex: 1; }
+  .ovg-body { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-8); }
+  .ovg-c h3 { font: 700 13px/1 var(--font-heading), "Noto Sans KR", sans-serif; margin: 0 0 8px; letter-spacing: 0.02em; }
+  .ovg-legend { display: flex; gap: 16px; margin: 0 0 10px; font-size: 11px; opacity: 0.8; }
+  .ovg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .ovg-legend i { width: 13px; height: 4px; display: block; }
+  .ovg-plot svg { width: 100%; height: auto; display: block; }
+  .ovg-plot .g-grid { stroke: var(--color-neutral-300); stroke-width: 1; }
+  .ovg-plot .g-target { stroke: var(--color-accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .ovg-plot .g-line { fill: none; stroke: var(--color-neutral-700); stroke-width: 2; stroke-linejoin: round; }
+  .ovg-plot .g-dot { stroke: var(--color-bg); stroke-width: 2; }
+  .ovg-plot text { font-family: var(--font-body), sans-serif; fill: var(--color-text); }
+  .ovg-plot .g-tick { font-size: 10px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+  .ovg-plot .g-val { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ovg-plot .g-note { font-size: 10px; font-weight: 700; fill: var(--color-accent-700); }
+  .ovg-tip { position: absolute; pointer-events: none; opacity: 0; transition: opacity 0.1s;
+    background: var(--color-text); color: var(--color-bg); padding: 7px 10px; font-size: 11px; line-height: 1.55;
+    white-space: nowrap; transform: translate(-50%, -115%); z-index: 5; font-variant-numeric: tabular-nums; }
+  .ovg-details { border-top: 1px solid var(--color-divider); padding-top: var(--space-4); }
+  .ovg-details summary { cursor: pointer; font: 700 12px/1 var(--font-body), sans-serif; letter-spacing: 0.04em; }
+  .ovg-details summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .ovg-table { width: 100%; border-collapse: collapse; margin-top: var(--space-4); font-size: 12px; }
+  .ovg-table caption { text-align: left; font-size: 10.5px; opacity: 0.6; padding-bottom: 8px; }
+  .ovg-table th, .ovg-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--color-divider); font-variant-numeric: tabular-nums; }
+  .ovg-table thead th { text-align: right; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+  .ovg-table th[scope="row"], .ovg-table thead th:first-child { text-align: left; }
+  .ovg-table tr.live th[scope="row"] { color: var(--color-accent-700); font-weight: 700; }
+  .ovg-table tr.live i { font-style: normal; font-size: 9px; }
+  .ovg-disclaimer { font-size: 10.5px; opacity: 0.62; margin: 0; text-wrap: pretty; line-height: 1.6; }
+  .ovg-foot { border-top: 2px solid var(--color-text); padding: var(--space-4) var(--space-6);
+    display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .ovg-foot button { appearance: none; cursor: pointer; border: 1px solid var(--color-text);
+    background: var(--color-bg); color: var(--color-text);
+    font: 700 12px/1 var(--font-body), "Noto Sans KR", sans-serif; letter-spacing: 0.04em; padding: 11px 16px; }
+  .ovg-foot button:hover { background: var(--color-text); color: var(--color-bg); }
+  .ovg-foot button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .ovg-mail.on { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+  .ovg-mail.on:hover { background: var(--color-accent-600); border-color: var(--color-accent-600); }
+  /* AI 요약 섹션 */
+  .ovg-ai { background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface)); border-left: 3px solid var(--color-accent);
+    padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); }
+  .ovg-ai[hidden] { display: none; }
+  .ovg-ai-badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--color-accent); background: var(--color-accent-100); padding: 2px 8px; margin-bottom: var(--space-2); }
+  .ovg-ai-summary { margin: 0 0 var(--space-2); font-size: 13.5px; line-height: 1.65; font-weight: 500; color: var(--color-text); }
+  .ovg-ai-imps { margin: 0 0 var(--space-2); padding-left: var(--space-4); font-size: 12.5px; line-height: 1.7; color: var(--color-text); opacity: 0.88; }
+  .ovg-ai-imps li { margin-bottom: 2px; }
+  .ovg-ai-ts { margin: 0; font-size: 10px; opacity: 0.45; }
+  .ovg-ai-loading { font-size: 12px; opacity: 0.6; }
+  .ovg-ai-err { font-size: 12px; color: var(--color-accent-700); }
+  .ovg-sub-panel { flex: 1 0 100%; border-top: 1px solid var(--color-divider); padding-top: var(--space-4);
+    display: flex; flex-direction: column; gap: 10px; }
+  .ovg-sub-panel[hidden] { display: none; }
+  .ovg-field { display: flex; align-items: center; gap: 10px; }
+  .ovg-field label { font-size: 11px; font-weight: 600; min-width: 96px; }
+  .ovg-field input, .ovg-field select { flex: 1; max-width: 320px; font: 400 13px/1 var(--font-body), sans-serif;
+    padding: 9px 10px; border: 1px solid var(--color-divider); background: var(--color-neutral-100); color: var(--color-text); }
+  .ovg-field input:focus-visible, .ovg-field select:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+  .ovg-field-n { font-size: 11px; opacity: 0.65; margin: 0; }
+  .ovg-sub-a { display: flex; gap: 10px; }
+  .ovg-sub-msg { margin: 0; font-size: 11.5px; min-height: 1.2em; }
+  .ovg-sub-msg.ok { color: var(--color-accent-700); font-weight: 600; }
+  .ovg-sub-msg.bad { color: var(--color-accent); font-weight: 700; }
+  .ovg-print-h { display: none; font-size: 11px; letter-spacing: 0.06em; padding: 8px var(--space-6) 0; margin: 0; opacity: 0.7; }
+  @media (max-width: 900px) {
+    .ovg-kpis { grid-template-columns: repeat(2, 1fr); }
+    .ovg-head { flex-wrap: wrap; }
+  }
+  @media print {
+    body.printing-stats { background: #fff; overflow: visible; display: block; height: auto; }
+    body.printing-stats > *:not(.ovg) { display: none !important; }
+    body.printing-stats .ovg { position: static; inset: auto; padding: 0; background: none; display: block; }
+    body.printing-stats .ovg-card { border: 0; box-shadow: none; width: 100%; max-height: none; display: block; }
+    body.printing-stats .ovg-tabs, body.printing-stats .ovg-x,
+    body.printing-stats .ovg-foot, body.printing-stats .ovg-tip { display: none !important; }
+    body.printing-stats .ovg-print-h { display: block; }
+    body.printing-stats .ovg-scroll { overflow: visible; }
+    body.printing-stats .ovg-body { padding: 0; gap: 18px; }
+    body.printing-stats .ovg-c, body.printing-stats .ovg-table { break-inside: avoid; }
+    body.printing-stats .ovg-details summary { display: none; }
+    @page { size: A4 portrait; margin: 14mm; }
+  }
 </style>
 </head>
 <body>
@@ -273,6 +411,13 @@
     <div class="sub">Piggy bank line · sensor monitor</div>
   </div>
   <div class="spacer"></div>
+  <button id="btn-stats">통계 그래프</button>
+  <button id="btn-overview">공장 전경</button>
+  <div class="line-switcher">
+    <button class="line-btn on" data-line="A">LINE A</button>
+    <button class="line-btn" data-line="B">LINE B</button>
+    <button class="line-btn" data-line="C">LINE C</button>
+  </div>
   <div class="counters">
     <div><span>사이클</span><b id="c-cycle">0</b></div>
     <div><span>완성</span><b id="c-done">0</b></div>
@@ -290,8 +435,9 @@
     <div class="k">라인 상태</div>
     <div class="v" id="status">대기</div>
     <div class="n" id="status-note">전 센서 정상 범위</div>
+    <button id="btn-resume">▶ 라인 재가동</button>
   </div>
-  <div class="controls">
+  <div class="controls" hidden aria-hidden="true">
     <button id="btn-run">▶ 정상 사이클 실행</button>
     <button id="btn-fault">⚠ 경고 사이클</button>
     <button id="btn-reset">⟲ 초기화</button>
@@ -310,6 +456,7 @@
 </aside>
 
 <script src="js/three-d-stage.js"></script>
+<script src="js/line-stats.js"></script>
 <script src="js/plant-overview.js"></script>
 <script type="module" src="js/piggy-line.js"></script>
 </body>
