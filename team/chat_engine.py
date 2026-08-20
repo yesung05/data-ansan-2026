@@ -110,7 +110,7 @@ def explain_with_gpt(question: str, simulation: dict[str, Any], notes: list[str]
         try:
             from openai import OpenAI
 
-            model = os.getenv("OPENAI_MODEL", "gpt-5.6")
+            model = os.getenv("OPENAI_MODEL", "gpt-4o")
             prompt = (
                 "당신은 제조 품질 분석 챗봇입니다. 아래의 계산 결과만 근거로 한국어로 3문장 이내로 답하세요. "
                 "인과관계를 단정하지 말고, 예측 불량률·변화폭·점검 행동을 설명하세요. 계산값을 바꾸거나 새 수치를 만들지 마세요.\n\n"

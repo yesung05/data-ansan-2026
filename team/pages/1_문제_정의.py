@@ -1,6 +1,9 @@
 import streamlit as st
 
+from ui_common import sidebar_augment_toggle
+
 st.set_page_config(page_title="문제 정의 | Factory Quality Radar", page_icon="🏭", layout="wide")
+sidebar_augment_toggle()
 st.title("문제 정의: 불량을 발견한 뒤 대응하면 늦습니다")
 st.subheader("현장의 문제")
 st.markdown("""제조 현장에서는 품질검사가 끝난 뒤에야 불량률을 확인하는 경우가 많습니다. 이때 담당자는 **어느 라인을 먼저 점검해야 하는지**, 설비의 비가동·생산성 변화가 품질 위험과 관련 있는지를 데이터로 판단하기 어렵습니다. 결과적으로 정비와 검사 인력이 모든 라인에 동일하게 배분될 수 있습니다.""")

@@ -1,7 +1,10 @@
 import pandas as pd
 import streamlit as st
 
+from ui_common import sidebar_augment_toggle
+
 st.set_page_config(page_title="AI 해결 설계 | Factory Quality Radar", page_icon="🧠", layout="wide")
+sidebar_augment_toggle()
 st.title("AI 해결 설계: 다음날 불량률을 예측합니다")
 st.subheader("무엇을 만들었나요?")
 st.markdown("**라인별 다음날 품질 불량률 회귀 모델**과, 그 결과를 직접 조작해 보는 What-if 시뮬레이터를 만들었습니다.")

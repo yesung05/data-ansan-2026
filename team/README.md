@@ -34,7 +34,7 @@ API 키 없이도 자연어 조건 해석과 로컬 회귀 모델 시뮬레이�
 ```powershell
 $env:OPENAI_API_KEY="your_api_key"
 # 선택: 접근 가능한 모델로 변경
-$env:OPENAI_MODEL="gpt-5.6"
+$env:OPENAI_MODEL="gpt-4o"
 python -m streamlit run app.py
 ```
 

@@ -59,8 +59,9 @@ def build_model_dataset(data_dir: Path = DATA_DIR) -> tuple[pd.DataFrame, pd.Dat
     )
     uptime_daily["availability"] = uptime_daily["run_min"] / uptime_daily["plan_min"]
     uptime_daily["downtime_rate"] = uptime_daily["downtime_min"] / uptime_daily["plan_min"]
-    uptime_daily["yield_rate"] = uptime_daily["good_qty"] / uptime_daily["prod_qty"]
-    uptime_daily["energy_per_unit"] = uptime_daily["energy_kwh"] / uptime_daily["prod_qty"]
+    safe_qty = uptime_daily["prod_qty"].replace(0, np.nan)
+    uptime_daily["yield_rate"] = uptime_daily["good_qty"] / safe_qty
+    uptime_daily["energy_per_unit"] = uptime_daily["energy_kwh"] / safe_qty
 
     reasons = uptime.assign(downtime_reason=uptime["downtime_reason"].fillna("정상/미기록"))
     reason_minutes = reasons.pivot_table(
@@ -105,7 +106,36 @@ def make_models(numeric_features: list[str], categorical_features: list[str]) ->
     }
 
 
-def train_and_evaluate(data_dir: Path = DATA_DIR) -> dict[str, Any]:
+def augment_training_data(
+    df: pd.DataFrame,
+    numeric_features: list[str],
+    target_col: str,
+    factor: int = 5,
+    noise_scale: float = 0.10,
+    random_state: int = RANDOM_STATE,
+) -> pd.DataFrame:
+    """학습 행마다 가우시안 노이즈를 더한 복사본을 생성해 factor배로 늘린다.
+
+    노이즈 크기는 각 피처 표준편차의 noise_scale배로, 관측 범위를 벗어나지 않도록 클리핑한다.
+    테스트 셋은 건드리지 않으므로 데이터 누출이 없다.
+    """
+    rng = np.random.default_rng(random_state)
+    cols_to_jitter = [c for c in numeric_features + [target_col] if c in df.columns]
+    stds = {c: df[c].std() for c in cols_to_jitter}
+    mins = {c: df[c].min() for c in cols_to_jitter}
+    maxs = {c: df[c].max() for c in cols_to_jitter}
+    copies = [df]
+    for _ in range(factor - 1):
+        jittered = df.copy()
+        for col in cols_to_jitter:
+            if stds[col] > 0:
+                noise = rng.normal(0, noise_scale * stds[col], size=len(df))
+                jittered[col] = (df[col] + noise).clip(mins[col], maxs[col])
+        copies.append(jittered)
+    return pd.concat(copies, ignore_index=True)
+
+
+def train_and_evaluate(data_dir: Path = DATA_DIR, augment: bool = False) -> dict[str, Any]:
     """시간 순서 hold-out 평가 후 성능이 가장 좋은 모델을 반환한다."""
     dataset, quality_daily = build_model_dataset(data_dir)
     labeled = dataset.dropna(subset=["target_defect_rate"]).copy()
@@ -114,6 +144,10 @@ def train_and_evaluate(data_dir: Path = DATA_DIR) -> dict[str, Any]:
     split_date = dates[max(1, int(len(dates) * 0.8))]
     train = labeled[labeled["inspect_date"] < split_date].copy()
     test = labeled[labeled["inspect_date"] >= split_date].copy()
+
+    if augment:
+        train = augment_training_data(train, numeric, target_col="target_defect_rate")
+
     x_train, y_train = train[numeric + categorical], train["target_defect_rate"]
     x_test, y_test = test[numeric + categorical], test["target_defect_rate"]
 
@@ -148,9 +182,11 @@ def train_and_evaluate(data_dir: Path = DATA_DIR) -> dict[str, Any]:
     latest_features = dataset[dataset["inspect_date"] == latest_feature_date].copy()
     latest_features["prediction"] = best_model.predict(latest_features[numeric + categorical]).clip(0, 1)
     train_target = labeled["target_defect_rate"]
+    q50 = float(train_target.quantile(0.5))
+    q80 = float(train_target.quantile(0.8))
     latest_features["risk_level"] = pd.cut(
         latest_features["prediction"],
-        bins=[-np.inf, train_target.quantile(0.5), train_target.quantile(0.8), np.inf],
+        bins=[-np.inf, q50, q80, np.inf],
         labels=["정상", "주의", "경고"],
     ).astype(str)
     latest_features["forecast_date"] = latest_feature_date + pd.Timedelta(days=1)
@@ -168,4 +204,6 @@ def train_and_evaluate(data_dir: Path = DATA_DIR) -> dict[str, Any]:
         "feature_count": len(numeric) + len(categorical),
         "train_rows": len(train),
         "test_rows": len(test),
+        "risk_thresholds": (q50, q80),
+        "augmented": augment,
     }
