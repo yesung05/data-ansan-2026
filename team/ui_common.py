@@ -3,6 +3,7 @@
 import streamlit as st
 
 from quality_risk_model import train_and_evaluate
+from sensor_model import train_sensor_model
 
 
 @st.cache_resource(show_spinner="품질 예측 모델을 학습하고 있습니다...")
@@ -22,6 +23,11 @@ def sidebar_augment_toggle() -> bool:
 
 def get_results(augment: bool = False):
     return _cached_results(augment)
+
+
+@st.cache_resource(show_spinner="센서 모델을 학습하고 있습니다...")
+def get_sensor_result():
+    return train_sensor_model()
 
 
 def risk_label(result, prediction: float) -> str:
